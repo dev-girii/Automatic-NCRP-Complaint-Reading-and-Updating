@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment
 import pytesseract
 import cv2
 from dotenv import load_dotenv
+import shutil
 import datetime
 import json
 try:
@@ -52,7 +53,24 @@ else:
     pass
 
 # ---------------- CONFIG ----------------
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+# Configure pytesseract executable path dynamically:
+# - Prefer environment variable TESSERACT_CMD if provided (useful on Render/Docker)
+# - Otherwise try to find tesseract on PATH via shutil.which
+# - Fallback to the common Windows install path if present
+tess_env = os.environ.get('TESSERACT_CMD') or os.environ.get('TESSERACT_PATH')
+if tess_env:
+    pytesseract.pytesseract.tesseract_cmd = tess_env
+else:
+    which_tess = shutil.which('tesseract')
+    if which_tess:
+        pytesseract.pytesseract.tesseract_cmd = which_tess
+    else:
+        _win_default = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+        if os.path.exists(_win_default):
+            pytesseract.pytesseract.tesseract_cmd = _win_default
+        else:
+            # No tesseract found; OCR calls will fail until TESSERACT_CMD is set or tesseract installed
+            print("⚠ Tesseract executable not found. Set TESSERACT_CMD environment variable or install tesseract on the host.")
 OUTPUT_FILE = "ncrp_complaints.xlsx"
 
 COLUMNS = [
