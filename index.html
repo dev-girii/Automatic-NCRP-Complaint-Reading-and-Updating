@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated NCRP Complaint Reading and Updating Tool</title>
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- SheetJS CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- DataTables CDN -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="login-page" class="page">
+        <div class="container-fluid vh-100 d-flex align-items-center justify-content-center bg-primary">
+            <div class="card shadow-lg" style="width: 400px;">
+                <div class="card-header bg-dark text-white text-center">
+                    <h4><i class="fas fa-shield-alt"></i> Secure Login</h4>
+                </div>
+                <div class="card-body">
+                    <form id="login-form">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" autocomplete="current-password" required>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Login</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-page" class="page d-none">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">NCRP Tool Dashboard</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="#" onclick="showPage('dashboard')">Dashboard</a>
+                        </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="complaints.html">Complaints</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="analytics.html">Analytics</a>
+                                </li>
+                        <li class="nav-item">
+                            <a class="btn btn-outline-light ms-2" href="#" onclick="logout()">Logout</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    <div class="container-fluid mt-4 dashboard-main">
+            <!-- Top Row: File Upload and Crime Awareness -->
+            <div class="row dashboard-row">
+                <!-- Left Section: File Upload (60% width) -->
+                <div class="col-md-7">
+                    <div class="card dashboard-card">
+                        <div class="card-header bg-primary text-white">
+                            <h5><i class="fas fa-upload"></i> File Upload</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="drop-zone" class="drop-zone">
+                                <div class="drop-zone-content">
+                                    <i class="fas fa-cloud-upload-alt drop-icon"></i>
+                                    <p class="drop-text">Drag & drop files here or <span class="browse-link">browse</span></p>
+                                    <p class="drop-subtext">Supported: CSV, XLSX, PDF, JPG, PNG</p>
+                                </div>
+                                <input type="file" id="file-input" multiple accept=".csv,.xlsx,.pdf,.jpg,.jpeg,.png" style="display: none;">
+                            </div>
+                            <div id="file-list" class="mt-3"></div>
+                            <!-- Make sure this button has type="button" NOT type="submit" -->
+                            <button type="button" id="process-btn" class="btn btn-success w-100 mt-3" disabled>Process Files</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Section: Crime Awareness (40% width) -->
+                <div class="col-md-5">
+                    <div class="card dashboard-card">
+                        <div class="card-header bg-dark text-white">
+                            <h5><i class="fas fa-list"></i> Categories</h5>
+                        </div>
+                        <div class="card-body" style="overflow-y: scroll;max-height: 20rem;">
+                            <div id="crime-awareness-list">
+                                <!-- Dynamically populated list of crime types and counts -->
+                                <div class="text-muted">Loading crime categories...</div>
+                            </div>
+                            <!-- <div class="alert alert-info mt-3">
+                                <small><i class="fas fa-info-circle"></i> Stay vigilant against these common cyber threats. Report suspicious activities immediately.</small>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Section: Full Width -->
+            <div class="stats-container">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center stat-card h-100">
+                            <div class="card-body">
+                                <i class="fas fa-list-ul stat-icon text-primary"></i>
+                                <h5 class="card-title">Total Complaints</h5>
+                                <h2 id="total-complaints" class="stat-number">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center stat-card h-100">
+                            <div class="card-body">
+                                <i class="fas fa-bolt stat-icon text-danger"></i>
+                                <h5 class="card-title">High Priority Cases <i class="fas fa-info-circle ms-1 text-muted" data-bs-toggle="tooltip" data-bs-placement="top" title="High Priority: amount &gt; 50,000 or crimes like kidnapping, threat, extortion, emergency"></i></h5>
+                                <h2 id="high-priority" class="stat-number">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center stat-card h-100">
+                            <div class="card-body">
+                                <i class="fas fa-clock stat-icon text-info"></i>
+                                <h5 class="card-title">Last 24 Hours</h5>
+                                <h2 id="last-24h" class="stat-number">0</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="card text-center stat-card h-100">
+                            <div class="card-body">
+                                <i class="fas fa-chart-bar stat-icon text-warning"></i>
+                                <h5 class="card-title">Most Common Crime Type</h5>
+                                <div id="most-common" class="stat-number" style="font-size:1.1rem;">-</div>
+                                <small id="most-common-count" class="text-muted d-block"></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer class="bg-dark text-white text-center py-3 mt-5">
+            A Tool which extracts complaint data from any File Formats.
+        </footer>
+    </div>
+
+    <!-- Complaints and Analytics pages are now separate files (complaints.html, analytics.html) -->
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>

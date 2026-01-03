@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Verify Extracted Complaints</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="p-4">
+  <div class="container">
+    <div class="d-flex align-items-center mb-3">
+      <h3 class="me-auto">Verify extracted complaints</h3>
+      <a href="index.html" class="btn btn-outline-secondary me-2">Back to Dashboard</a>
+      <button id="approve-all" class="btn btn-success me-2">Approve All</button>
+      <button id="reject-all" class="btn btn-danger">Reject All</button>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div id="pending-info" class="mb-3 text-muted"></div>
+        <table id="verify-table" class="table table-sm table-bordered">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Preview</th>
+              <th>Decision</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button id="submit-decisions" class="btn btn-primary">Submit Decisions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script/verify.js"></script>
+</body>
+</html>

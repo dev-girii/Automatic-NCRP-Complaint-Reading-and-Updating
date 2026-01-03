@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - NCRP Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html"><i class="fas fa-chart-pie"></i> Analytics</a>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="index.html">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="complaints.html">Complaints</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#">Analytics</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container-fluid my-4">
+        <div class="row gy-3">
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Crime Type Distribution</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="crimeType">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartCrimeType"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Monthly Trend (last 6 months)</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="monthlyTrend">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartMonthlyTrend"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Platform Usage</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="platformUsage">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartPlatform"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Case Status</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="caseStatus">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartStatus"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Amount Distribution</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="amountDistribution">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartAmount"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card chart-card shadow-sm">
+                    <div class="card-header d-flex align-items-center justify-content-between">
+                        <h6 class="mb-0">Top Districts</h6>
+                        <button class="btn btn-sm btn-outline-primary view-larger" data-chart="topDistricts">View Larger</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-canvas-wrap">
+                            <canvas id="chartDistricts"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal for enlarged chart -->
+    <div class="modal fade" id="chartModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="chartModalTitle">Chart</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="width:100%;height:60vh;display:flex;align-items:center;justify-content:center;">
+                        <canvas id="modalChartCanvas" style="max-width:100%;max-height:100%"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script/analytics.js"></script>
+</body>
+</html>

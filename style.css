@@ -1,0 +1,309 @@
+/* Custom styles for government-style UI */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.page {
+    min-height: 100vh;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+.btn {
+    border-radius: 0.375rem;
+}
+
+.table th {
+    background-color: #343a40;
+    color: white;
+    border: none;
+}
+
+.table td {
+    border-color: #dee2e6;
+}
+
+.alert {
+    border-radius: 0.375rem;
+}
+
+footer {
+    /* Make footer flow with content (not fixed) so dashboard can be single-page without viewport overlay */
+    position: relative;
+    bottom: auto;
+    width: 100%;
+    background-color: #343a40 !important;
+}
+
+/* Drag & Drop Zone Styles */
+.drop-zone {
+    border: 2px dashed #007bff;
+    border-radius: 10px;
+    padding: 40px 20px;
+    text-align: center;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.drop-zone:hover {
+    background-color: #e3f2fd;
+    border-color: #0056b3;
+}
+
+.drop-zone.dragover {
+    background-color: #e8f5e8;
+    border-color: #28a745;
+    transform: scale(1.02);
+}
+
+.drop-icon {
+    font-size: 3rem;
+    color: #007bff;
+    margin-bottom: 15px;
+    transition: color 0.3s ease;
+}
+
+.drop-zone:hover .drop-icon {
+    color: #0056b3;
+}
+
+.drop-text {
+    font-size: 1.1rem;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.drop-subtext {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.browse-link {
+    color: #007bff;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.browse-link:hover {
+    color: #0056b3;
+}
+
+/* Statistics Cards */
+.stat-card {
+    border-radius: 10px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.stat-number {
+    font-weight: bold;
+    font-size: 2rem;
+    margin-top: 10px;
+}
+
+/* Crime Awareness Items */
+.crime-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.crime-item:last-child {
+    border-bottom: none;
+}
+
+.crime-item i {
+    font-size: 1.2rem;
+    min-width: 20px;
+}
+
+/* Highlight duplicate rows in complaints table */
+.duplicate-row {
+    background-color: #fff3cd !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .navbar-nav {
+        text-align: center;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    footer {
+        position: relative;
+    }
+}
+
+/* View Details Link Styling */
+.view-details-link {
+    color: #28a745;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.view-details-link:hover {
+    color: #1e7e34;
+    background-color: #f8f9fa;
+    text-decoration: underline;
+}
+
+.view-details-link:active {
+    color: #155724;
+    background-color: #e9ecef;
+}
+
+/* Preliminary Action Link Styling */
+.preliminary-action-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.preliminary-action-link:hover {
+    color: #0056b3;
+    background-color: #f8f9fa;
+    text-decoration: underline;
+}
+
+.preliminary-action-link:active {
+    color: #004085;
+    background-color: #e9ecef;
+}
+
+/* Dashboard Layout Improvements */
+.dashboard-row {
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+}
+
+.dashboard-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Statistics Section */
+.stats-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    padding: 2rem;
+    margin-top: 1rem;
+}
+
+/* Make the dashboard a single-page layout that fills the viewport */
+html, body { height: 100%; overflow-x: hidden; }
+/* Ensure consistent box-sizing and prevent horizontal overflow */
+*, *::before, *::after { box-sizing: border-box; }
+/* Reset body spacing which can push content beyond 100vh */
+body { margin: 0; padding: 0; }
+
+/* Use flex allocation so children never push total beyond 100vh */
+#dashboard-page { display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; overflow: hidden; }
+
+/* Navbar: fixed allocation */
+#dashboard-page .navbar { flex: 0 0 8vh; min-height: 56px; }
+
+/* Main content occupies remaining space and scrolls internally */
+.dashboard-main { flex: 1 1 70vh; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding-top: 0.5rem; margin-top: 0 !important; box-sizing: border-box; }
+
+.dashboard-row { display: flex; gap: 1rem; align-items: stretch; flex: 1 1 auto; flex-direction: row !important; flex-wrap: nowrap; }
+.dashboard-row > .col-md-7, .dashboard-row > .col-md-5 { display: flex; flex-direction: column; }
+
+/* Force 60/40 split on desktop to avoid unintended vertical stacking.
+    Use calc() to account for gap so total doesn't exceed 100% and avoid overflow-x. */
+.dashboard-row > .col-md-7 { flex: 0 0 calc(60% - 0.5rem); max-width: calc(60% - 0.5rem); }
+.dashboard-row > .col-md-5 { flex: 0 0 calc(40% - 0.5rem); max-width: calc(40% - 0.5rem); }
+.dashboard-card .card-body { display: flex; flex-direction: column; flex: 1 1 auto; }
+.drop-zone { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; }
+.drop-zone .drop-text, .drop-zone .drop-subtext { text-align: center; }
+.stats-container { flex: 0 0 auto; }
+
+/* Footer fixed allocation */
+footer { flex: 0 0 8vh; display: flex; align-items: center; justify-content: center; margin-top: 0 !important; }
+
+.stat-card {
+    border-radius: 10px;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+}
+
+.stat-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.stat-number {
+    font-weight: bold;
+    font-size: 2rem;
+    margin-top: 10px;
+    color: #495057;
+}
+
+/* Responsive adjustments for dashboard */
+@media (max-width: 768px) {
+    .dashboard-row {
+        margin-bottom: 1rem;
+        flex-direction: column !important;
+        flex-wrap: wrap;
+    }
+
+    .stats-container {
+        padding: 1rem;
+    }
+
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Complaints table wrapper to allow horizontal scrolling when needed */
+.complaints-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+#complaints-table { width: 100%; min-width: 1100px; table-layout: auto; }
+
+/* Prevent DataTables from forcing overflow on the page; allow internal scrolling */
+.dataTables_wrapper .dataTables_scroll { overflow: auto; }
