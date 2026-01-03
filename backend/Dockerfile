@@ -1,40 +1,38 @@
-# Base image
 FROM python:3.11-slim
 
-# Prevent Python from writing pyc files and buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    TESSERACT_CMD=/usr/bin/tesseract
+    PYTHONUNBUFFERED=1
 
-# Install system dependencies for OpenCV, Tesseract, PDFs, and video support
+# Install system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    libtesseract-dev \
-    libleptonica-dev \
-    pkg-config \
-    poppler-utils \
-    ffmpeg \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    build-essential \
+       tesseract-ocr \
+       libtesseract-dev \
+       libleptonica-dev \
+       pkg-config \
+       poppler-utils \
+       ffmpeg \
+       libgl1 \
+       libglib2.0-0 \
+       build-essential \
+       cmake \
+       wget \
+       git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy requirements first (Docker cache optimization)
-COPY requirements.txt .
+# Copy requirements and install Python deps
+COPY requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Upgrade pip and install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
-
-# Copy backend source code
+# Copy backend sources
 COPY . /app
 
-# Expose Flask/Gunicorn port
+# Expose port used by Flask/Gunicorn
 EXPOSE 5000
 
-# Run the Flask app with Gunicorn
-# Ensure `app.py` contains `app = Flask(__name__)`
+# Set default TESSERACT_CMD env (optional)
+ENV TESSERACT_CMD=/usr/bin/tesseract
+
+# Run the Flask app using gunicorn
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "4"]
