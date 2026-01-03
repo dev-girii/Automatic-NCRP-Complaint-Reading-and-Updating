@@ -1,6 +1,6 @@
 // verify.js - handles the verify.html page
 (function(){
-  // resolve verify endpoint dynamically from backend config (exposed at /api/config)
+  // Using hardcoded backend base URL (no /api/config). Fetch endpoints are built from this value.
   let API_VERIFY = null;
 
   function escapeHtml(s){
@@ -98,8 +98,8 @@
       }
       Swal.fire({title:'Saving...', allowOutsideClick:false, didOpen:()=>Swal.showLoading()});
       try{
-  // ensure API_VERIFY resolved
-  const base = window.API_BASE || (await (async function(){ try{ const r=await fetch('/api/config'); if(r.ok){ const j=await r.json(); return j.API_BASE || j.api_base; } }catch(e){} return null; })()) || 'http://localhost:5000';
+  // use hardcoded backend base URL per project setting
+  const base = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
   const res = await fetch(base + '/api/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'save', rows: allowed})});
         const jr = await res.json().catch(()=>({}));
         Swal.close();

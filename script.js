@@ -9,7 +9,9 @@ let mostCommonCrime = { type: null, count: 0 };
 const DUMMY_USERNAME = 'admin';
 const DUMMY_PASSWORD = 'admin123';
 
-// complaints/analytics-related sample data removed; dashboard keeps counters only
+// Hardcoded backend base URL and uploads route (per user request)
+const HARDCODED_API_BASE = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+const HARDCODED_UPLOADS_ROUTE = '/uploads';
 window.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
     e.preventDefault();
@@ -18,19 +20,20 @@ window.addEventListener('keydown', function(e) {
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
-    // Load runtime config from backend (.env exposed via /api/config)
-    initConfig().catch(err => console.warn('initConfig failed', err));
+    // using hardcoded API base; removed dynamic config calls
 
-    document.getElementById('process-btn').addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    
-    // Call your processFiles function
-    processFiles();
-    
-    return false;
-});
+    // Attach process button handler if the element exists (some pages may not include it)
+    const initialProcessBtn = document.getElementById('process-btn');
+    if (initialProcessBtn) {
+        initialProcessBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            // Call your processFiles function
+            processFiles();
+            return false;
+        });
+    }
 
     // Check if already logged in
     if (localStorage.getItem('loggedIn') === 'true') {
@@ -40,11 +43,13 @@ document.addEventListener('DOMContentLoaded', function() {
         showPage('login');
     }
 
-    // Login form submit
-    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    // Login form submit (guarded)
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
 
-    // File input change
-    document.getElementById('file-input').addEventListener('change', handleFileSelect);
+    // File input change (guarded)
+    const fileInputEl = document.getElementById('file-input');
+    if (fileInputEl) fileInputEl.addEventListener('change', handleFileSelect);
 
     // Drag & Drop functionality
     const dropZone = document.getElementById('drop-zone');
@@ -67,8 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, true); // capture
     }
 
-    // No complaints/analytics initialization here; those pages are separate.
-    // Initialize Bootstrap tooltips (for info icons etc.)
+    loadStats();
     try{
         if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -76,30 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }catch(e){ console.debug('Tooltip init failed', e); }
 
-    // Load stats for dashboard
-    // Ensure config loaded before requesting stats (loadStats uses window.API_BASE)
-    (async () => { try { await initConfig(); } catch(_){}; loadStats(); })();
 });
-
-
-// Fetch runtime config from backend (/api/config) and set window.API_BASE / window.UPLOADS_ROUTE
-async function initConfig() {
-    try {
-        const res = await fetch('/api/config');
-        if (!res.ok) throw new Error('config fetch failed');
-        const cfg = await res.json();
-        window.API_BASE = cfg.API_BASE || cfg.api_base || window.API_BASE || 'http://localhost:5000';
-        window.UPLOADS_ROUTE = cfg.UPLOADS_ROUTE || cfg.uploads_route || '/uploads';
-        console.info('Loaded runtime config', { API_BASE: window.API_BASE, UPLOADS_ROUTE: window.UPLOADS_ROUTE });
-        return cfg;
-    } catch (e) {
-        // fallback defaults
-        window.API_BASE = window.API_BASE || 'http://localhost:5000';
-        window.UPLOADS_ROUTE = window.UPLOADS_ROUTE || '/uploads';
-        console.warn('Could not load /api/config, using defaults', e);
-        return null;
-    }
-}
 
 // Prevent anchor links with href="#" from navigating
 document.addEventListener('click', function(e) {
@@ -267,7 +248,7 @@ async function processFiles() {
     Swal.fire({ title: 'Uploading...', text: 'Uploading files to server for extraction', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
 
     try {
-    const uploadUrl = (window.API_BASE || 'http://localhost:5000') + '/api/upload';
+    const uploadUrl = HARDCODED_API_BASE + '/api/upload';
     console.info('Uploading to', uploadUrl);
     const res = await fetch(uploadUrl, { method: 'POST', body: form });
         const text = await res.text();
@@ -373,7 +354,7 @@ function showVerificationModal(rows) {
             setBusy(true);
             Swal.fire({ title: 'Saving allowed rows...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
-                const verifyUrl = (window.API_BASE || 'http://localhost:5000') + '/api/verify';
+                const verifyUrl = HARDCODED_API_BASE + '/api/verify';
                 const res = await fetch(verifyUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save', rows: allowedRows }) });
                 let jr = {};
                 try { jr = await res.json(); } catch (e) { jr = {}; }
@@ -558,8 +539,8 @@ function animateCounter(elementId, targetValue) {
 // Fetch complaints and compute dashboard stats
 async function loadStats(){
     try{
-        const base = window.API_BASE || 'http://localhost:5000';
-        const res = await fetch(base + '/api/complaints');
+    const base = HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    const res = await fetch(base + '/api/complaints');
         if(!res.ok){
             console.warn('Could not load complaints for stats', res.status);
             return;

@@ -1,24 +1,16 @@
 // Complaints page script
 document.addEventListener('DOMContentLoaded', async () => {
-    // load API base
-    try {
-        const cfgRes = await fetch('/api/config');
-        const cfg = cfgRes.ok ? await cfgRes.json() : null;
-        window.API_BASE = (cfg && cfg.API_BASE) ? cfg.API_BASE : (window.API_BASE || 'http://localhost:5000');
-        window.UPLOADS_ROUTE = (cfg && cfg.UPLOADS_ROUTE) ? cfg.UPLOADS_ROUTE : (window.UPLOADS_ROUTE || '/uploads');
-    } catch (e) {
-        console.warn('Could not load API config, defaulting to http://localhost:5000', e);
-        window.API_BASE = window.API_BASE || 'http://localhost:5000';
-        window.UPLOADS_ROUTE = window.UPLOADS_ROUTE || '/uploads';
-    }
+    // Hardcoded backend base and uploads route per user request
+    window.HARDCODED_API_BASE = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    window.HARDCODED_UPLOADS_ROUTE = '/uploads';
     // fetch and render complaints
     fetchComplaintsFromServer();
 });
 
 async function fetchComplaintsFromServer() {
     try {
-        const base = window.API_BASE || 'http://localhost:5000';
-        const res = await fetch(base + '/api/complaints');
+    const base = window.HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    const res = await fetch(base + '/api/complaints');
         if (!res.ok) {
             const txt = await res.text();
             throw new Error(txt || `HTTP ${res.status}`);
@@ -65,7 +57,7 @@ function appendRowsToTable(rows) {
     tbody.innerHTML = '';
     rows.forEach(complaint => {
         const row = document.createElement('tr');
-        const base = window.API_BASE || 'http://localhost:5000';
+        const base = window.HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
         const saved = complaint.savedFilename || complaint.savedFilename || null;
         const fileLink = saved ? (base + '/uploads/' + encodeURIComponent(saved)) : null;
 

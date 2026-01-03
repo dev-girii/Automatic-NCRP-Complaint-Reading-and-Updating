@@ -126,20 +126,10 @@
     }
 
     async function loadAndRender() {
-        // try api first
+        // use hardcoded backend base URL
         let rows = [];
         try {
-            const cfgRes = await fetch('/api/config');
-            if (cfgRes.ok) {
-                const cfg = await cfgRes.json();
-                window.API_BASE = cfg.API_BASE || window.API_BASE;
-            }
-        } catch (e) {
-            // ignore
-        }
-
-        try {
-            const base = window.API_BASE || 'http://localhost:5000';
+            const base = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
             const r = await fetch(base + '/api/complaints');
             if (r.ok) {
                 const js = await r.json();
