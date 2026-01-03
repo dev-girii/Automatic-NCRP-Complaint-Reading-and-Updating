@@ -9,7 +9,6 @@ import datetime
 app = Flask(__name__)
 CORS(app)
 
-# Ensure backend path imports the script
 import ncrp_script as ncrp
 import pandas as pd
 
