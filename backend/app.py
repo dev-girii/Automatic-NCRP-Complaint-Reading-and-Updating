@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
+import shutil
 from werkzeug.utils import secure_filename
 import tempfile
 import traceback
@@ -12,15 +13,52 @@ CORS(app)
 import ncrp_script as ncrp
 import pandas as pd
 
-# Upload folder
+# Upload folder (permanent storage after approval)
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 INDEX_FILE = os.path.join(UPLOAD_FOLDER, 'file_index.json')
+
+# Temp/pending folder (files stored here until approved)
+PENDING_FOLDER = os.path.join(os.path.dirname(__file__), 'pending')
+os.makedirs(PENDING_FOLDER, exist_ok=True)
+
+# SQLite database
+DATA_DB_PATH = os.path.join(os.path.dirname(__file__), 'data.db')
+DB_TABLE = 'ncrp_complaints'
+
+
+def init_sqlite_db():
+    """Create SQLite table if it doesn't exist."""
+    import sqlite3
+    conn = sqlite3.connect(DATA_DB_PATH)
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS {DB_TABLE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT,
+            complaint_id TEXT UNIQUE,
+            complaint_date TEXT,
+            incident_datetime TEXT,
+            mobile TEXT,
+            email TEXT,
+            full_address TEXT,
+            district TEXT,
+            state TEXT,
+            cybercrime_type TEXT,
+            platform TEXT,
+            total_amount_lost REAL,
+            current_status TEXT,
+            saved_filename TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     """Accept multipart/form-data files under 'files' and process them with existing extractor.
+    Files are saved to PENDING folder (not uploads) until approved via /api/verify.
     Returns extracted rows for verification by the frontend.
     """
     try:
@@ -36,7 +74,7 @@ def api_upload():
             return jsonify({'error': 'no files provided'}), 400
 
         rows = []
-        saved_files = []
+        pending_files = []
         for f in files:
             # Ensure we have a usable filename; if not, generate one
             raw_name = getattr(f, 'filename', '') or ''
@@ -56,31 +94,31 @@ def api_upload():
                 os.close(fd)
                 filename = os.path.basename(tmpname)
 
-            dest = os.path.join(UPLOAD_FOLDER, filename)
+            # Save to PENDING folder (not uploads) - file will be moved on approval
+            dest = os.path.join(PENDING_FOLDER, filename)
+            # Avoid overwriting existing pending files
+            base, ext = os.path.splitext(filename)
+            counter = 1
+            while os.path.exists(dest):
+                filename = f"{base}_{counter}{ext}"
+                dest = os.path.join(PENDING_FOLDER, filename)
+                counter += 1
+
             try:
                 f.save(dest)
-                saved_files.append(filename)
-                app.logger.info('Saved uploaded file to %s (size=%s)', dest, os.path.getsize(dest))
+                pending_files.append(filename)
+                app.logger.info('Saved pending file to %s (size=%s)', dest, os.path.getsize(dest))
             except Exception as e:
-                app.logger.exception('Failed to save uploaded file %s: %s', filename, e)
+                app.logger.exception('Failed to save pending file %s: %s', filename, e)
                 rows.append({'Source': 'ERROR', 'Complaint ID': '', 'error': f'failed to save: {e}', 'file': filename})
                 continue
 
-            # Process the saved file with extractor. Ensure extractor return is normalized to a dict/object
+            # Process the pending file with extractor
             try:
                 result = ncrp.extract_ncrp(dest)
                 if result is None:
-                    rows.append({'Source': 'ERROR', 'Complaint ID': '', 'error': 'no data extracted', 'file': filename})
+                    rows.append({'Source': 'ERROR', 'Complaint ID': '', 'error': 'no data extracted', 'file': filename, 'pending_file': filename})
                 else:
-                    # Attempt to determine complaint id from the extractor result so we can rename the file
-                    deduced_id = None
-                    def _extract_id_from_row(r):
-                        if not r: return None
-                        for key in ('Complaint ID','complaint_id','id','ComplaintId'):
-                            if isinstance(r, dict) and key in r and r[key]:
-                                return str(r[key])
-                        return None
-
                     # Normalize result to list of dicts
                     normalized = []
                     if isinstance(result, list):
@@ -94,79 +132,164 @@ def api_upload():
                     else:
                         normalized.append({'value': result})
 
-                    # Try to pick first available complaint id
-                    for r_item in normalized:
-                        candidate = _extract_id_from_row(r_item)
-                        if candidate:
-                            deduced_id = candidate
-                            break
-
-                    # If we have an id, rename the saved file to <id>.<ext> for easy mapping
-                    new_filename = filename
-                    try:
-                        if deduced_id:
-                            # Clean id to safe filename chars
-                            safe_id = secure_filename(deduced_id)
-                            _, ext = os.path.splitext(filename)
-                            if not ext:
-                                # guess from content-type
-                                ext = ''
-                            candidate_name = f"{safe_id}{ext}"
-                            candidate_path = os.path.join(UPLOAD_FOLDER, candidate_name)
-                            # avoid overwriting existing - add suffix if needed
-                            suffix = 1
-                            base_candidate = candidate_name
-                            while os.path.exists(candidate_path):
-                                candidate_name = f"{safe_id}_{suffix}{ext}"
-                                candidate_path = os.path.join(UPLOAD_FOLDER, candidate_name)
-                                suffix += 1
-                            # perform rename
-                            os.rename(dest, candidate_path)
-                            new_filename = candidate_name
-                            dest = candidate_path
-                            app.logger.info('Renamed uploaded file to %s', new_filename)
-                            # update saved_files list entry if present
-                            try:
-                                saved_files[-1] = new_filename
-                            except Exception:
-                                pass
-                            # update index mapping file so complaints can be linked later
-                            try:
-                                import json
-                                idx = {}
-                                if os.path.exists(INDEX_FILE):
-                                    with open(INDEX_FILE, 'r', encoding='utf-8') as fh:
-                                        try:
-                                            idx = json.load(fh) or {}
-                                        except Exception:
-                                            idx = {}
-                                idx[str(safe_id)] = new_filename
-                                with open(INDEX_FILE, 'w', encoding='utf-8') as fh:
-                                    json.dump(idx, fh)
-                            except Exception:
-                                app.logger.exception('Failed to update uploads index')
-                    except Exception:
-                        app.logger.exception('Failed to rename uploaded file %s', filename)
-
-                    # Attach the saved filename to each returned row so frontend can build the file link
+                    # Attach the pending filename to each returned row (will be moved on approval)
                     for item in normalized:
                         if isinstance(item, dict):
-                            item['saved_filename'] = new_filename
+                            item['pending_file'] = filename
                         rows.append(item)
             except Exception as e:
                 app.logger.exception('Extraction failed for %s: %s', filename, e)
-                rows.append({'Source': 'ERROR', 'Complaint ID': '', 'error': str(e), 'file': filename})
+                rows.append({'Source': 'ERROR', 'Complaint ID': '', 'error': str(e), 'file': filename, 'pending_file': filename})
 
         # Always return a JSON body so frontend doesn't get an empty response
-        return jsonify({'rows': rows, 'files': saved_files}), 200
+        return jsonify({'rows': rows, 'files': pending_files}), 200
     except Exception as e:
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
+def _save_row_to_sqlite(row):
+    """Save a single row dict to SQLite data.db. Returns None on success, raises on error."""
+    import sqlite3
+    init_sqlite_db()
+
+    col_map = {
+        "Source": "source",
+        "Complaint ID": "complaint_id",
+        "Complaint Date": "complaint_date",
+        "Incident Date & Time": "incident_datetime",
+        "Mobile": "mobile",
+        "Email": "email",
+        "Full Address": "full_address",
+        "District": "district",
+        "State": "state",
+        "Cybercrime Type": "cybercrime_type",
+        "Platform": "platform",
+        "Total Amount Lost": "total_amount_lost",
+        "Current Status": "current_status",
+    }
+
+    vals = {}
+    for df_col, sql_col in col_map.items():
+        v = row.get(df_col) or row.get(sql_col)
+        vals[sql_col] = v
+
+    # Clean dates
+    if vals.get("complaint_date"):
+        try:
+            dt = pd.to_datetime(vals["complaint_date"], dayfirst=True, errors="coerce")
+            vals["complaint_date"] = dt.strftime("%Y-%m-%d") if pd.notna(dt) else None
+        except Exception:
+            vals["complaint_date"] = str(vals["complaint_date"]) if vals["complaint_date"] else None
+    if vals.get("incident_datetime"):
+        try:
+            dt = pd.to_datetime(vals["incident_datetime"], dayfirst=True, errors="coerce")
+            vals["incident_datetime"] = dt.strftime("%Y-%m-%d %H:%M:%S") if pd.notna(dt) else str(vals["incident_datetime"])
+        except Exception:
+            vals["incident_datetime"] = str(vals["incident_datetime"]) if vals["incident_datetime"] else None
+
+    # Clean amount
+    if vals.get("total_amount_lost") is not None and vals.get("total_amount_lost") != "NOT FOUND":
+        try:
+            s = str(vals["total_amount_lost"]).replace(",", "").replace(" ", "")
+            vals["total_amount_lost"] = float(s) if s else None
+        except (ValueError, TypeError):
+            vals["total_amount_lost"] = None
+    else:
+        vals["total_amount_lost"] = None
+
+    vals["saved_filename"] = row.get("saved_filename") or row.get("file") or None
+
+    conn = sqlite3.connect(DATA_DB_PATH)
+    try:
+        conn.execute(
+            """
+            INSERT INTO """ + DB_TABLE + """ (source, complaint_id, complaint_date, incident_datetime, mobile, email,
+                full_address, district, state, cybercrime_type, platform, total_amount_lost, current_status, saved_filename)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                vals.get("source"),
+                vals.get("complaint_id"),
+                vals.get("complaint_date"),
+                vals.get("incident_datetime"),
+                vals.get("mobile"),
+                vals.get("email"),
+                vals.get("full_address"),
+                vals.get("district"),
+                vals.get("state"),
+                vals.get("cybercrime_type"),
+                vals.get("platform"),
+                vals.get("total_amount_lost"),
+                vals.get("current_status"),
+                vals.get("saved_filename"),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _move_pending_to_uploads(pending_file, complaint_id):
+    """Move a file from pending folder to uploads folder, renaming by complaint_id.
+    Returns the final filename in uploads folder, or None if no file to move.
+    """
+    import json
+    if not pending_file:
+        return None
+    
+    src = os.path.join(PENDING_FOLDER, pending_file)
+    if not os.path.exists(src):
+        app.logger.warning('Pending file not found: %s', src)
+        return None
+    
+    # Determine final filename based on complaint_id
+    _, ext = os.path.splitext(pending_file)
+    if complaint_id:
+        safe_id = secure_filename(str(complaint_id))
+        final_name = f"{safe_id}{ext}"
+    else:
+        final_name = pending_file
+    
+    dest = os.path.join(UPLOAD_FOLDER, final_name)
+    # Avoid overwriting existing files
+    counter = 1
+    base = final_name.rsplit('.', 1)[0] if '.' in final_name else final_name
+    while os.path.exists(dest):
+        final_name = f"{base}_{counter}{ext}"
+        dest = os.path.join(UPLOAD_FOLDER, final_name)
+        counter += 1
+    
+    try:
+        shutil.move(src, dest)
+        app.logger.info('Moved pending file %s to uploads as %s', pending_file, final_name)
+        
+        # Update index mapping
+        if complaint_id:
+            try:
+                idx = {}
+                if os.path.exists(INDEX_FILE):
+                    with open(INDEX_FILE, 'r', encoding='utf-8') as fh:
+                        try:
+                            idx = json.load(fh) or {}
+                        except Exception:
+                            idx = {}
+                idx[str(complaint_id)] = final_name
+                with open(INDEX_FILE, 'w', encoding='utf-8') as fh:
+                    json.dump(idx, fh)
+            except Exception:
+                app.logger.exception('Failed to update uploads index')
+        
+        return final_name
+    except Exception as e:
+        app.logger.exception('Failed to move pending file %s: %s', pending_file, e)
+        return None
+
+
 @app.route('/api/verify', methods=['POST'])
 def api_verify():
-    """Receive verification decision. If action == 'save', save rows to MySQL (and optionally Sheets).
+    """Receive verification decision. If action == 'save', move files from pending to uploads,
+    save rows to SQLite (data.db) and Excel.
     Expected JSON: { rows: [...], action: 'save'|'reject' }
     """
     try:
@@ -178,55 +301,56 @@ def api_verify():
         rows = data.get('rows', [])
 
         if action == 'reject':
+            # Clean up pending files for rejected rows
+            for row in rows:
+                pending_file = row.get('pending_file')
+                if pending_file:
+                    try:
+                        src = os.path.join(PENDING_FOLDER, pending_file)
+                        if os.path.exists(src):
+                            os.remove(src)
+                            app.logger.info('Deleted rejected pending file: %s', pending_file)
+                    except Exception:
+                        pass
             return jsonify({'status': 'rejected', 'message': 'Rows rejected by user'}), 200
 
         if action == 'save':
             if not rows:
                 return jsonify({'error': 'no rows to save'}), 400
 
-            # Read DB credentials from env
-            db_user = os.environ.get('DB_USER')
-            db_password = os.environ.get('DB_PASSWORD', '')
-            db_host = os.environ.get('DB_HOST', 'localhost')
-            db_port = int(os.environ.get('DB_PORT', 3306))
-            db_name = os.environ.get('DB_NAME', 'ncrp_db')
-            db_table = os.environ.get('DB_TABLE', 'ncrp_complaints')
-
-            if not db_user:
-                return jsonify({'error': 'DB_USER not configured on server'}), 500
-
+            init_sqlite_db()
             saved = []
             failed = []
             skipped = []
 
-            # Create an engine for duplicate checks (we'll still use ncrp.save_df_to_mysql for insertion to keep cleaning logic)
-            from sqlalchemy import create_engine, text
-            engine = create_engine(f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?charset=utf8mb4")
-
-            # Save rows one-by-one to provide per-row feedback, but check duplicates first
             for idx, row in enumerate(rows):
                 try:
-                    # Determine complaint id (if any) for duplicate detection
+                    # Get complaint ID from the frontend-edited row
                     cid = None
                     if isinstance(row, dict):
                         cid = row.get('Complaint ID') or row.get('complaint_id') or row.get('id') or row.get('ComplaintId')
+                    
+                    # Check for duplicates in DB
                     if cid:
-                        # check DB for existing complaint_id
+                        import sqlite3
+                        conn = sqlite3.connect(DATA_DB_PATH)
                         try:
-                            q = text(f"SELECT 1 FROM {db_table} WHERE complaint_id = :cid LIMIT 1")
-                            with engine.connect() as conn:
-                                res = conn.execute(q, {'cid': str(cid)}).fetchone()
-                                if res:
-                                    # duplicate found -> skip
-                                    skipped.append({'index': idx, 'row': row, 'reason': 'duplicate complaint_id'})
-                                    continue
-                        except Exception:
-                            # if duplicate check fails for any reason, log and proceed to attempt save
-                            app.logger.exception('Duplicate check failed for complaint_id %s', cid)
+                            cur = conn.execute("SELECT 1 FROM {0} WHERE complaint_id = ? LIMIT 1".format(DB_TABLE), (str(cid),))
+                            if cur.fetchone():
+                                skipped.append({'index': idx, 'row': row, 'reason': 'duplicate complaint_id'})
+                                continue
+                        finally:
+                            conn.close()
 
-                    # Build single-row DataFrame using ncrp.COLUMNS to ensure consistent columns
-                    df_row = pd.DataFrame([row], columns=ncrp.COLUMNS)
-                    ncrp.save_df_to_mysql(df_row, user=db_user, password=db_password, host=db_host, port=db_port, db=db_name, table=db_table)
+                    # Move file from pending to uploads (using the frontend complaint ID)
+                    pending_file = row.get('pending_file')
+                    final_filename = _move_pending_to_uploads(pending_file, cid)
+                    
+                    # Update row with final filename for DB storage
+                    if final_filename:
+                        row['saved_filename'] = final_filename
+                    
+                    _save_row_to_sqlite(row)
                     saved.append({'index': idx, 'row': row})
                 except Exception as e:
                     traceback.print_exc()
@@ -284,26 +408,16 @@ def api_verify():
 
 @app.route('/api/complaints', methods=['GET'])
 def api_complaints():
-    """Fetch complaints from the configured MySQL DB and return as JSON.
+    """Fetch complaints from SQLite data.db and return as JSON.
     """
     try:
-        db_user = os.environ.get('DB_USER')
-        db_password = os.environ.get('DB_PASSWORD', '')
-        db_host = os.environ.get('DB_HOST', 'localhost')
-        db_port = int(os.environ.get('DB_PORT', 3306))
-        db_name = os.environ.get('DB_NAME', 'ncrp_db')
-        db_table = os.environ.get('DB_TABLE', 'ncrp_complaints')
-
-        if not db_user:
-            return jsonify({'error': 'DB_USER not configured on server'}), 500
-
-        from sqlalchemy import create_engine, text
-        engine = create_engine(f"mysql+pymysql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}?charset=utf8mb4")
-        q = text(f"SELECT * FROM {db_table} ORDER BY id DESC LIMIT 1000")
-        with engine.connect() as conn:
-            res = conn.execute(q)
-            cols = res.keys()
-            rows = [dict(zip(cols, row)) for row in res.fetchall()]
+        init_sqlite_db()
+        import sqlite3
+        conn = sqlite3.connect(DATA_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute("SELECT * FROM {0} ORDER BY id DESC LIMIT 1000".format(DB_TABLE))
+        rows = [dict(row) for row in cur.fetchall()]
+        conn.close()
 
         # Convert SQL column names to frontend-friendly names
         mapped = []
@@ -360,4 +474,5 @@ def serve_upload(filename):
 
 
 if __name__ == '__main__':
+    print('Using SQLite database:', DATA_DB_PATH)
     app.run(host='0.0.0.0', port=5000, debug=True)
