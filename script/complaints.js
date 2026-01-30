@@ -1,7 +1,7 @@
 // Complaints page script
 document.addEventListener('DOMContentLoaded', async () => {
     // Hardcoded backend base and uploads route per user request
-    window.HARDCODED_API_BASE = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    window.HARDCODED_API_BASE = 'http://127.0.0.1:5000';
     window.HARDCODED_UPLOADS_ROUTE = '/uploads';
     // fetch and render complaints
     fetchComplaintsFromServer();
@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function fetchComplaintsFromServer() {
     try {
-    const base = window.HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    const base = window.HARDCODED_API_BASE || 'http://127.0.0.1:5000';
     const res = await fetch(base + '/api/complaints');
         if (!res.ok) {
             const txt = await res.text();
@@ -57,7 +57,7 @@ function appendRowsToTable(rows) {
     tbody.innerHTML = '';
     rows.forEach(complaint => {
         const row = document.createElement('tr');
-        const base = window.HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+        const base = window.HARDCODED_API_BASE || 'http://127.0.0.1:5000';
         const saved = complaint.savedFilename || complaint.savedFilename || null;
         const fileLink = saved ? (base + '/uploads/' + encodeURIComponent(saved)) : null;
 

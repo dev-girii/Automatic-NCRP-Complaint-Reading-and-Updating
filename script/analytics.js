@@ -167,7 +167,7 @@
         // use hardcoded backend base URL
         let rows = [];
         try {
-            const base = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+            const base = 'http://127.0.0.1:5000';
             const r = await fetch(base + '/api/complaints');
             if (r.ok) {
                 const js = await r.json();
