@@ -10,7 +10,7 @@ const DUMMY_USERNAME = 'admin';
 const DUMMY_PASSWORD = 'admin123';
 
 // Hardcoded backend base URL and uploads route (per user request)
-const HARDCODED_API_BASE = 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+const HARDCODED_API_BASE = 'http://127.0.0.1:5000';
 const HARDCODED_UPLOADS_ROUTE = '/uploads';
 window.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
@@ -21,19 +21,6 @@ window.addEventListener('keydown', function(e) {
 // Initialize the app
 document.addEventListener('DOMContentLoaded', function() {
     // using hardcoded API base; removed dynamic config calls
-
-    // Attach process button handler if the element exists (some pages may not include it)
-    const initialProcessBtn = document.getElementById('process-btn');
-    if (initialProcessBtn) {
-        initialProcessBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            // Call your processFiles function
-            processFiles();
-            return false;
-        });
-    }
 
     // Check if already logged in
     if (localStorage.getItem('loggedIn') === 'true') {
@@ -60,16 +47,15 @@ document.addEventListener('DOMContentLoaded', function() {
         dropZone.addEventListener('drop', handleDrop);
     }
 
-    // Process button click -> upload to backend for processing. prevent form submit refresh
-    // Use capture phase and stopImmediatePropagation to prevent any other handlers or form submits from firing
-    const _procBtn = document.getElementById('process-btn');
-    if (_procBtn) {
-        _procBtn.addEventListener('click', function(e) {
+    // Process button click -> single handler to prevent double execution
+    const processBtn = document.getElementById('process-btn');
+    if (processBtn) {
+        processBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            e.stopImmediatePropagation();
+            e.stopPropagation();
+            if (this.disabled) return;
             processFiles();
-            return false;
-        }, true); // capture
+        });
     }
 
     loadStats();
@@ -231,14 +217,19 @@ function removeFile(button, fileName) {
     document.getElementById('process-btn').disabled = true;
 }
 
+let _processFilesInProgress = false;
 // Process files
 async function processFiles() {
-    console.debug('processFiles triggered');
+    if (_processFilesInProgress) return;
     const files = document.getElementById('file-input').files;
     if (!files || files.length === 0) {
         Swal.fire({ icon: 'warning', title: 'No files', text: 'Please select files to process' });
         return;
     }
+
+    _processFilesInProgress = true;
+    const processBtn = document.getElementById('process-btn');
+    if (processBtn) processBtn.disabled = true;
 
     const form = new FormData();
     for (let f of files) form.append('files', f);
@@ -279,6 +270,8 @@ async function processFiles() {
         Swal.fire({ icon: 'error', title: 'Upload failed', text: String(err) });
     } finally {
         setBusy(false);
+        _processFilesInProgress = false;
+        if (processBtn) processBtn.disabled = false;
     }
 }
 
@@ -539,7 +532,7 @@ function animateCounter(elementId, targetValue) {
 // Fetch complaints and compute dashboard stats
 async function loadStats(){
     try{
-    const base = HARDCODED_API_BASE || 'https://automatic-ncrp-complaint-reading-and.onrender.com';
+    const base = HARDCODED_API_BASE || 'http://127.0.0.1:5000';
     const res = await fetch(base + '/api/complaints');
         if(!res.ok){
             console.warn('Could not load complaints for stats', res.status);
