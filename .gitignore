@@ -1,1 +1,6 @@
 .env
+backend/uploads/
+backend/pending/
+backend/data.db
+backend/pycache/
+backend/ncrp_complaints.xlsx
