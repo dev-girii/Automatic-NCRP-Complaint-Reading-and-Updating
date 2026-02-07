@@ -1,0 +1,71 @@
+{
+  "name": "ncrp-complaint-tool",
+  "version": "1.0.0",
+  "description": "Automated NCRP Complaint Reading and Updating Tool",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-backend": "cd backend && pyinstaller --onefile --name ncrp-backend --add-data \"ncrp_script.py;.\" app.py",
+    "build": "electron-builder",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --dir"
+  },
+  "author": "NCRP Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "portfinder": "^1.0.32"
+  },
+  "build": {
+    "appId": "com.ncrp.complainttool",
+    "productName": "NCRP Complaint Tool",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "*.html",
+      "*.css",
+      "*.js",
+      "script/**/*",
+      "!backend/**/*",
+      "!node_modules/**/*",
+      "!dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist/",
+        "to": "backend/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "tools/tesseract/",
+        "to": "tools/tesseract/",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "portable": {
+      "artifactName": "NCRP-Tool-Portable.exe"
+    }
+  }
+}

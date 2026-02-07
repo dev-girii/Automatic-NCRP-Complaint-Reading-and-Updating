@@ -176,30 +176,17 @@
 
         Swal.close();
         if (res.ok) {
-          const saved = jr.saved_count || 0;
-          const failed = jr.failed_count || 0;
-          const skipped = jr.skipped_count || 0;
-          const excelInfo = jr.excel || jr.excel_info || null;
-          let excelHtml = '';
-          if (excelInfo) {
-            const p = escapeHtml(excelInfo.path || excelInfo.filename || JSON.stringify(excelInfo));
-            excelHtml = `<div style="margin-top:.5rem;font-size:.9rem">Excel: <code>${p}</code></div>`;
-          }
-          let summaryHtml = '';
-          if (failed > 0) {
-            const msgs = (jr.failed || []).map(f => `${f.index}: ${f.error}`);
-            summaryHtml += `<div style="text-align:left;max-height:240px;overflow:auto"><strong>Failures:</strong><pre>${escapeHtml(msgs.join('\n'))}</pre></div>`;
-          }
-          if (skipped > 0) {
-            const smsgs = (jr.skipped || []).map(s => `${s.index}: ${s.reason || 'duplicate'}`);
-            summaryHtml += `<div style="text-align:left;max-height:240px;overflow:auto"><strong>Skipped (${skipped}):</strong><pre>${escapeHtml(smsgs.join('\n'))}</pre></div>`;
-          }
-          if (summaryHtml) {
-            Swal.fire({ icon: failed > 0 ? 'warning' : 'info', title: `Saved ${saved} rows`, html: `${summaryHtml}${excelHtml}` });
-          } else {
-            Swal.fire({ icon: 'success', title: `Saved ${saved} rows`, html: excelHtml });
-          }
           sessionStorage.removeItem('ncrp_pending_rows');
+          Swal.fire({
+            toast: true,
+            icon: 'success',
+            title: 'Submitted decisions',
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true
+          });
+          setTimeout(() => { window.location.href = 'index.html'; }, 1500);
         } else {
           Swal.fire({ icon: 'error', title: 'Save failed', text: jr.error || `HTTP ${res.status}` });
         }

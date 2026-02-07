@@ -2,5 +2,23 @@
 backend/uploads/
 backend/pending/
 backend/data.db
-backend/pycache/
+backend/__pycache__/
 backend/ncrp_complaints.xlsx
+backend/dist/
+backend/build/
+backend/*.spec.bak
+
+# Node.js / Electron
+node_modules/
+dist/
+*.log
+package-lock.json
+
+# PyInstaller
+*.manifest
+*.spec.bak
+
+# Bundled Tesseract (run setup-tesseract.bat to populate)
+tools/tesseract/*.exe
+tools/tesseract/*.dll
+tools/tesseract/tessdata/

@@ -1,10 +1,23 @@
 // Complaints page script
+let complaintsData = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Hardcoded backend base and uploads route per user request
     window.HARDCODED_API_BASE = 'http://127.0.0.1:5000';
     window.HARDCODED_UPLOADS_ROUTE = '/uploads';
     // fetch and render complaints
     fetchComplaintsFromServer();
+
+    // Delegated click for Preliminary Action links
+    document.getElementById('complaints-tbody').addEventListener('click', async (e) => {
+        const link = e.target.closest('.preliminary-action-link');
+        if (!link) return;
+        e.preventDefault();
+        const tr = link.closest('tr');
+        const idx = parseInt(tr.dataset.rowIndex, 10);
+        if (isNaN(idx) || !complaintsData[idx]) return;
+        await handlePreliminaryAction(complaintsData[idx]);
+    });
 });
 
 async function fetchComplaintsFromServer() {
@@ -45,6 +58,7 @@ async function fetchComplaintsFromServer() {
             }
         }catch(e){ console.warn('Category filter parse failed', e); }
 
+        complaintsData = complaints;
         appendRowsToTable(complaints);
     } catch (e) {
         console.error('Could not load complaints:', e);
@@ -55,8 +69,9 @@ async function fetchComplaintsFromServer() {
 function appendRowsToTable(rows) {
     const tbody = document.getElementById('complaints-tbody');
     tbody.innerHTML = '';
-    rows.forEach(complaint => {
+    rows.forEach((complaint, i) => {
         const row = document.createElement('tr');
+        row.dataset.rowIndex = i;
         const base = window.HARDCODED_API_BASE || 'http://127.0.0.1:5000';
         const saved = complaint.savedFilename || complaint.savedFilename || null;
         const fileLink = saved ? (base + '/uploads/' + encodeURIComponent(saved)) : null;
@@ -85,6 +100,55 @@ function appendRowsToTable(rows) {
         $('#complaints-table').DataTable().clear().destroy();
     }
     $('#complaints-table').DataTable({ pageLength: 10, lengthMenu: [5,10,25,50], responsive: true, order: [[0,'desc']] });
+}
+
+function complaintToMitigationPayload(complaint) {
+    const ds = (complaint.districtState || '').split(', ');
+    return {
+        'Cybercrime Type': complaint.cybercrimeType || complaint.cybercrime_type || '',
+        'Platform': complaint.platformInvolved || complaint.platform || '',
+        'Total Amount Lost': complaint.totalAmountLoss || complaint.total_amount_lost || '',
+        'State': ds[1] || ds[0] || '',
+        'District': ds[0] || ''
+    };
+}
+
+async function handlePreliminaryAction(complaint) {
+    const base = window.HARDCODED_API_BASE || 'http://127.0.0.1:5000';
+    const payload = complaintToMitigationPayload(complaint);
+    Swal.fire({ title: 'Loading...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    try {
+        const res = await fetch(base + '/api/mitigation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        Swal.close();
+        if (res.ok && data.mitigation_measures) {
+            Swal.fire({
+                title: 'Preliminary Action',
+                html: `<div class="text-start" style="white-space: pre-wrap;">${escapeHtml(data.mitigation_measures)}</div>`,
+                width: '560px',
+                confirmButtonText: 'Close'
+            });
+        } else {
+            Swal.fire({ icon: 'error', title: 'Error', text: data.error || 'Failed to get mitigation suggestions' });
+        }
+    } catch (e) {
+        Swal.close();
+        Swal.fire({ icon: 'error', title: 'Error', text: String(e) });
+    }
+}
+
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function showToast(message, type='info'){

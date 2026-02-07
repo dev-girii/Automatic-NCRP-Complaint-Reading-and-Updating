@@ -6,24 +6,28 @@ from werkzeug.utils import secure_filename
 import tempfile
 import traceback
 import datetime
-
+import subprocess
 app = Flask(__name__)
 CORS(app)
 
 import ncrp_script as ncrp
 import pandas as pd
 
+# Base data path: C:\NCRP (or NCRP_DATA_PATH env when set by Electron)
+BASE_DATA_PATH = os.environ.get('NCRP_DATA_PATH', r'C:\NCRP')
+os.makedirs(BASE_DATA_PATH, exist_ok=True)
+
 # Upload folder (permanent storage after approval)
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+UPLOAD_FOLDER = os.path.join(BASE_DATA_PATH, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 INDEX_FILE = os.path.join(UPLOAD_FOLDER, 'file_index.json')
 
 # Temp/pending folder (files stored here until approved)
-PENDING_FOLDER = os.path.join(os.path.dirname(__file__), 'pending')
+PENDING_FOLDER = os.path.join(BASE_DATA_PATH, 'pending')
 os.makedirs(PENDING_FOLDER, exist_ok=True)
 
 # SQLite database
-DATA_DB_PATH = os.path.join(os.path.dirname(__file__), 'data.db')
+DATA_DB_PATH = os.path.join(BASE_DATA_PATH, 'data.db')
 DB_TABLE = 'ncrp_complaints'
 
 
@@ -471,6 +475,82 @@ def serve_upload(filename):
     except Exception as e:
         app.logger.exception('Failed to serve upload %s: %s', filename, e)
         return jsonify({'error': 'file not found'}), 404
+
+
+OLLAMA_MODEL = "huggingface.co/QuantFactory/Meta-Llama-3-8B-Instruct-GGUF:latest"
+#OLLAMA_MODEL = "llama3"
+
+
+def ask_llm(prompt: str) -> str:
+    """Call Ollama safely and return text"""
+    try:
+        process = subprocess.run(
+            ["ollama", "run", OLLAMA_MODEL],
+            input=prompt,
+            text=True,
+            encoding="utf-8",
+            errors="ignore",
+            capture_output=True,
+            timeout=120
+        )
+        return process.stdout.strip()
+
+    except Exception as e:
+        return f"LLM Error: {e}"
+
+
+def build_prompt(data: dict) -> str:
+    return f"""
+You are an Indian cybercrime investigation assistant.
+
+Complaint Details:
+Cybercrime Type: {data.get("Cybercrime Type")}
+Platform: {data.get("Platform")}
+Amount Lost: ₹{data.get("Total Amount Lost")}
+State: {data.get("State")}
+District: {data.get("District")}
+
+TASK:
+Explain the risk briefly and suggest mitigation measures.
+
+RULES:
+- Answer in bullet points
+- Max 80 words
+- i should not get this line "Here is a brief explanation of the risk and suggested mitigation measures:" and this one Let me know if you'd like me to improve anything!
+""" 
+
+@app.route("/api/input", methods=["GET"])
+def get_input_format():
+    sample_data = {
+        "Cybercrime Type": "UPI Fraud",
+        "Platform": "PhonePe",
+        "Total Amount Lost": 15000,
+        "State": "Tamil Nadu",
+        "District": "Chennai"
+    }
+
+    prompt = build_prompt(sample_data)
+    response = ask_llm(prompt)  
+
+    return jsonify({
+        "status": "success",
+        "mitigation_measures": response
+    })
+
+@app.route("/api/mitigation", methods=["POST"])
+def generate_mitigation():
+    data = request.json
+
+    if not data:
+        return jsonify({"error": "No JSON data received"}), 400
+
+    prompt = build_prompt(data)
+    response = ask_llm(prompt)
+
+    return jsonify({
+        "status": "success",
+        "mitigation_measures": response
+    })
 
 
 if __name__ == '__main__':

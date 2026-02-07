@@ -54,24 +54,58 @@ else:
 
 # ---------------- CONFIG ----------------
 # Configure pytesseract executable path dynamically:
-# - Prefer environment variable TESSERACT_CMD if provided (useful on Render/Docker)
-# - Otherwise try to find tesseract on PATH via shutil.which
-# - Fallback to the common Windows install path if present
-tess_env = os.environ.get('TESSERACT_CMD') or os.environ.get('TESSERACT_PATH')
-if tess_env:
-    pytesseract.pytesseract.tesseract_cmd = tess_env
-else:
+# 1. TESSERACT_CMD env (set by Electron with bundled path, or user override)
+# 2. TESSERACT_PATH env
+# 3. NCRP_APP_PATH + relative path (Electron bundled: resources/tools/tesseract/tesseract.exe)
+# 4. shutil.which('tesseract')
+# 5. Common Windows install paths
+def _resolve_tesseract_path():
+    tess_env = os.environ.get('TESSERACT_CMD') or os.environ.get('TESSERACT_PATH')
+    if tess_env and os.path.exists(tess_env):
+        return tess_env
+    # Bundled path (Electron sets NCRP_APP_PATH to resources folder)
+    app_path = os.environ.get('NCRP_APP_PATH')
+    if app_path:
+        for rel in ['tools/tesseract/tesseract.exe', 'tesseract/tesseract.exe']:
+            candidate = os.path.join(app_path, rel)
+            if os.path.exists(candidate):
+                return os.path.normpath(candidate)
     which_tess = shutil.which('tesseract')
     if which_tess:
-        pytesseract.pytesseract.tesseract_cmd = which_tess
-    else:
-        _win_default = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        if os.path.exists(_win_default):
-            pytesseract.pytesseract.tesseract_cmd = _win_default
-        else:
-            # No tesseract found; OCR calls will fail until TESSERACT_CMD is set or tesseract installed
-            print("⚠ Tesseract executable not found. Set TESSERACT_CMD environment variable or install tesseract on the host.")
-OUTPUT_FILE = "ncrp_complaints.xlsx"
+        return which_tess
+    # Common Windows paths (no user-specific paths)
+    for _path in [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        os.path.join(os.path.expandvars("%ProgramFiles%"), "Tesseract-OCR", "tesseract.exe"),
+        os.path.join(os.path.expandvars("%ProgramFiles(x86)%"), "Tesseract-OCR", "tesseract.exe"),
+        os.path.join(os.path.expandvars("%LOCALAPPDATA%"), "Programs", "Tesseract-OCR", "tesseract.exe"),
+    ]:
+        if _path and os.path.exists(_path):
+            return _path
+    return None
+
+_tess_cmd = _resolve_tesseract_path()
+
+if _tess_cmd:
+    pytesseract.pytesseract.tesseract_cmd = _tess_cmd
+
+    tess_dir = os.path.dirname(os.path.abspath(_tess_cmd))
+    tessdata_dir = os.path.join(tess_dir, "tessdata")
+
+    if not os.path.exists(os.path.join(tessdata_dir, "eng.traineddata")):
+        raise RuntimeError(f"eng.traineddata not found in {tessdata_dir}")
+
+    # TESSDATA_PREFIX = tessdata folder (Tesseract looks for TESSDATA_PREFIX/eng.traineddata)
+    os.environ["TESSDATA_PREFIX"] = os.path.normpath(tessdata_dir).replace("\\", "/")
+
+else:
+    raise RuntimeError("Tesseract executable not found")
+
+# Excel output: C:\NCRP\ncrp_complaints.xlsx (or NCRP_DATA_PATH when set by Electron)
+_NCRP_BASE = os.environ.get('NCRP_DATA_PATH', r'C:\NCRP')
+os.makedirs(_NCRP_BASE, exist_ok=True)
+OUTPUT_FILE = os.path.join(_NCRP_BASE, 'ncrp_complaints.xlsx')
 
 COLUMNS = [
     "Source",
@@ -180,13 +214,37 @@ def read_pdf(path):
             text += " " + t
     return clean(text)
 
+def _get_tessdata_config():
+    """Build config for --tessdata-dir (points directly to tessdata)."""
+    if _tess_cmd and os.path.exists(_tess_cmd):
+        tess_dir = os.path.dirname(os.path.abspath(_tess_cmd))
+        tessdata_dir = os.path.join(tess_dir, "tessdata")
+
+        if (
+            os.path.isdir(tessdata_dir)
+            and os.path.exists(os.path.join(tessdata_dir, "eng.traineddata"))
+        ):
+            return f'--tessdata-dir "{tessdata_dir.replace(chr(92), "/")}"'
+
+    return ""
+
+
 def read_image(path):
     img = cv2.imread(path)
     if img is None:
         raise ValueError(f"Image not readable: {path}")
+
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     gray = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)[1]
-    return clean(pytesseract.image_to_string(gray, lang="eng"))
+
+    # DO NOT pass --tessdata-dir
+    return clean(
+        pytesseract.image_to_string(
+            gray,
+            lang="eng",
+            config="--oem 3 --psm 6"
+        )
+    )
 
 # ---------------- EXTRACTION ----------------
 def extract_ncrp(file_path):
@@ -428,6 +486,9 @@ if __name__ == "__main__":
     # write to a timestamped fallback file and return that path.
     def _safe_save_excel(df_obj, target_path):
         try:
+            out_dir = os.path.dirname(target_path)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
             df_obj.to_excel(target_path, index=False)
             return target_path
         except PermissionError:
