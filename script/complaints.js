@@ -1,3 +1,47 @@
+$.fn.dataTable.ext.search.push(function (settings, data) {
+
+    const complaintDate = parseDate(data[1]);
+    const incidentDate = parseDate(data[2]);
+    const amount = parseFloat(data[9]) || 0;
+    const processedDate = parseDate(data[11]);
+
+    const cFrom = parseDate($('#complaintFrom').val());
+    const cTo = parseDate($('#complaintTo').val());
+    const iFrom = parseDate($('#incidentFrom').val());
+    const iTo = parseDate($('#incidentTo').val());
+    const pFrom = parseDate($('#processedFrom').val());
+    const pTo = parseDate($('#processedTo').val());
+
+    const district = $('#districtFilter').val();
+    const state = $('#stateFilter').val();
+    const platform = $('#platformFilter').val();
+    const crime = $('#crimeFilter').val();
+    const status = $('#statusFilter').val();
+
+    const minAmt = parseFloat($('#amountMin').val()) || -Infinity;
+    const maxAmt = parseFloat($('#amountMax').val()) || Infinity;
+
+    if (cFrom && complaintDate && complaintDate < cFrom) return false;
+    if (cTo && complaintDate && complaintDate > cTo) return false;
+
+    if (iFrom && incidentDate && incidentDate < iFrom) return false;
+    if (iTo && incidentDate && incidentDate > iTo) return false;
+
+    if (pFrom && processedDate && processedDate < pFrom) return false;
+    if (pTo && processedDate && processedDate > pTo) return false;
+
+    if (amount < minAmt || amount > maxAmt) return false;
+
+    if (district && !data[6].includes(district)) return false;
+    if (state && !data[6].includes(state)) return false;
+    if (platform && data[8] !== platform) return false;
+    if (crime && data[7] !== crime) return false;
+    if (status && data[10] !== status) return false;
+
+    return true;
+});
+
+
 // Complaints page script
 let complaintsData = [];
 
@@ -59,6 +103,7 @@ async function fetchComplaintsFromServer() {
         }catch(e){ console.warn('Category filter parse failed', e); }
 
         complaintsData = complaints;
+        populateFilters(complaints);
         appendRowsToTable(complaints);
     } catch (e) {
         console.error('Could not load complaints:', e);
@@ -99,7 +144,17 @@ function appendRowsToTable(rows) {
     if ($.fn.DataTable && $.fn.DataTable.isDataTable && $.fn.DataTable.isDataTable('#complaints-table')) {
         $('#complaints-table').DataTable().clear().destroy();
     }
-    $('#complaints-table').DataTable({ pageLength: 10, lengthMenu: [5,10,25,50], responsive: true, order: [[0,'desc']] });
+    $('#complaints-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [5,10,25,50],
+        responsive: true,
+        order: [[0,'desc']]
+    });
+    // ===== Trigger Excel-style filtering on input change =====
+$('.form-control, .form-select').off('change keyup').on('change keyup', function () {
+    $('#complaints-table').DataTable().draw();
+});
+
 }
 
 function complaintToMitigationPayload(complaint) {
@@ -153,4 +208,47 @@ function escapeHtml(s) {
 
 function showToast(message, type='info'){
     Swal.fire({ toast:true, position:'top-end', showConfirmButton:false, timer:3000, icon:type, title:message });
+}
+
+function parseDate(value) {
+    if (!value || value === 'NOT FOUND') return null;
+    const d = new Date(value.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1'));
+    return isNaN(d) ? null : d;
+}
+
+
+function populateFilters(data) {
+    const districtSet = new Set();
+    const stateSet = new Set();
+    const platformSet = new Set();
+    const crimeSet = new Set();
+    const statusSet = new Set();
+
+    data.forEach(r => {
+        if (r.districtState) {
+            const parts = r.districtState.split(',');
+            districtSet.add(parts[0]?.trim());
+            if (parts[1]) stateSet.add(parts[1].trim());
+        }
+        if (r.platformInvolved) platformSet.add(r.platformInvolved);
+        if (r.cybercrimeType) crimeSet.add(r.cybercrimeType);
+        if (r.currentStatus) statusSet.add(r.currentStatus);
+    });
+
+    fillSelect('districtFilter', districtSet);
+    fillSelect('stateFilter', stateSet);
+    fillSelect('platformFilter', platformSet);
+    fillSelect('crimeFilter', crimeSet);
+    fillSelect('statusFilter', statusSet);
+}
+
+function fillSelect(id, values) {
+    const el = document.getElementById(id);
+    values.forEach(v => {
+        if (!v) return;
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = v;
+        el.appendChild(opt);
+    });
 }

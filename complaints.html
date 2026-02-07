@@ -33,6 +33,86 @@
                 <h5><i class="fas fa-list"></i> Complaint Records</h5>
             </div>
             <div class="card-body">
+                <div class="row g-2 mb-3">
+
+                    <!-- Complaint Date -->
+                    <div class="col-md-3">
+                        <label class="form-label">Complaint Date (From - To)</label>
+                        <div class="d-flex gap-1">
+                            <input type="date" id="complaintFrom" class="form-control">
+                            <input type="date" id="complaintTo" class="form-control">
+                        </div>
+                    </div>
+                
+                    <!-- Incident Date -->
+                    <div class="col-md-3">
+                        <label class="form-label">Incident Date (From - To)</label>
+                        <div class="d-flex gap-1">
+                            <input type="date" id="incidentFrom" class="form-control">
+                            <input type="date" id="incidentTo" class="form-control">
+                        </div>
+                    </div>
+                
+                    <!-- District -->
+                    <div class="col-md-2">
+                        <label class="form-label">District</label>
+                        <select id="districtFilter" class="form-select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                
+                    <!-- State -->
+                    <div class="col-md-2">
+                        <label class="form-label">State</label>
+                        <select id="stateFilter" class="form-select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                
+                    <!-- Platform -->
+                    <div class="col-md-2">
+                        <label class="form-label">Platform</label>
+                        <select id="platformFilter" class="form-select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                
+                    <!-- Cybercrime -->
+                    <div class="col-md-3">
+                        <label class="form-label">Cybercrime Type</label>
+                        <select id="crimeFilter" class="form-select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                
+                    <!-- Status -->
+                    <div class="col-md-2">
+                        <label class="form-label">Status</label>
+                        <select id="statusFilter" class="form-select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                
+                    <!-- Amount -->
+                    <div class="col-md-3">
+                        <label class="form-label">Amount Loss (Min - Max)</label>
+                        <div class="d-flex gap-1">
+                            <input type="number" id="amountMin" class="form-control" placeholder="Min">
+                            <input type="number" id="amountMax" class="form-control" placeholder="Max">
+                        </div>
+                    </div>
+                
+                    <!-- Processed Date -->
+                    <div class="col-md-3">
+                        <label class="form-label">Processed Date</label>
+                        <div class="d-flex gap-1">
+                            <input type="date" id="processedFrom" class="form-control">
+                            <input type="date" id="processedTo" class="form-control">
+                        </div>
+                    </div>
+                
+                </div>
+                
                 <div class="table-responsive complaints-table-wrap">
                     <table id="complaints-table" class="table table-striped" style="width:100%">
                     <thead>
