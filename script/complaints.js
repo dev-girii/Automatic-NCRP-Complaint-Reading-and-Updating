@@ -46,13 +46,12 @@ $.fn.dataTable.ext.search.push(function (settings, data) {
 let complaintsData = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Hardcoded backend base and uploads route per user request
     window.HARDCODED_API_BASE = 'http://127.0.0.1:5000';
     window.HARDCODED_UPLOADS_ROUTE = '/uploads';
-    // fetch and render complaints
     fetchComplaintsFromServer();
 
-    // Delegated click for Preliminary Action links
+    document.getElementById('export-excel-btn').addEventListener('click', exportTableToExcel);
+
     document.getElementById('complaints-tbody').addEventListener('click', async (e) => {
         const link = e.target.closest('.preliminary-action-link');
         if (!link) return;
@@ -208,6 +207,86 @@ function escapeHtml(s) {
 
 function showToast(message, type='info'){
     Swal.fire({ toast:true, position:'top-end', showConfirmButton:false, timer:3000, icon:type, title:message });
+}
+
+function exportTableToExcel() {
+    if (typeof XLSX === 'undefined') {
+        showToast('Excel library not loaded', 'error');
+        return;
+    }
+    const table = document.getElementById('complaints-table');
+    if (!table || !$.fn.DataTable.isDataTable('#complaints-table')) {
+        if (complaintsData.length === 0) {
+            showToast('No data to export', 'warning');
+            return;
+        }
+        exportRowsToExcel(complaintsData);
+        return;
+    }
+    const dt = $('#complaints-table').DataTable();
+    const visibleNodes = dt.rows({ search: 'applied' }).nodes();
+    const rowsToExport = [];
+    for (let i = 0; i < visibleNodes.length; i++) {
+        const tr = visibleNodes[i];
+        const idx = parseInt(tr.getAttribute('data-row-index'), 10);
+        if (!isNaN(idx) && complaintsData[idx]) {
+            rowsToExport.push(complaintsData[idx]);
+        }
+    }
+    if (rowsToExport.length === 0) {
+        showToast('No rows to export (apply filters or load data)', 'warning');
+        return;
+    }
+    exportRowsToExcel(rowsToExport);
+}
+
+function exportRowsToExcel(rows) {
+    const headers = [
+        'Complaint ID', 'Complaint Date', 'Incident Date & Time', 'Mobile Number', 'Email ID',
+        'Full Address', 'District & State', 'Cybercrime Type', 'Platform Involved', 'Total Amount Loss',
+        'Current Status', 'Processed Date & Time'
+    ];
+    const keys = [
+        'id', 'complaintDate', 'incidentDateTime', 'mobileNumber', 'emailId',
+        'fullAddress', 'districtState', 'cybercrimeType', 'platformInvolved', 'totalAmountLoss',
+        'currentStatus', 'processedDateTime'
+    ];
+    const data = rows.map(r => {
+        const row = {};
+        const keyAliases = {
+            id: ['id', 'complaint_id'],
+            complaintDate: ['complaintDate', 'complaint_date'],
+            incidentDateTime: ['incidentDateTime', 'incident_datetime'],
+            mobileNumber: ['mobileNumber', 'mobile'],
+            emailId: ['emailId', 'email'],
+            fullAddress: ['fullAddress', 'full_address'],
+            districtState: ['districtState', 'district_state'],
+            cybercrimeType: ['cybercrimeType', 'cybercrime_type'],
+            platformInvolved: ['platformInvolved', 'platform'],
+            totalAmountLoss: ['totalAmountLoss', 'total_amount_lost'],
+            currentStatus: ['currentStatus', 'current_status'],
+            processedDateTime: ['processedDateTime', 'processed_datetime', 'created_at']
+        };
+        headers.forEach((h, i) => {
+            const k = keys[i];
+            const aliases = keyAliases[k] || [k];
+            let val = '';
+            for (const a of aliases) {
+                if (r[a] != null && r[a] !== '') {
+                    val = r[a];
+                    break;
+                }
+            }
+            row[h] = val == null ? '' : String(val);
+        });
+        return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Complaints');
+    const fileName = 'ncrp_complaints_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    XLSX.writeFile(wb, fileName);
+    showToast('Export downloaded: ' + fileName, 'success');
 }
 
 function parseDate(value) {
