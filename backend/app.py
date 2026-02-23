@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from flask_cors import CORS
 import os
 import shutil
@@ -58,7 +58,87 @@ def init_sqlite_db():
     conn.commit()
     conn.close()
 
+import json
 
+@app.route("/api/generate_letters", methods=["POST"])
+def generate_letter():
+    """Receive a complaint ID plus an Excel/CSV file and generate letters.
+
+    Expects multipart/form-data with fields:
+      - complaint_id
+      - file (the excel/csv document)
+    The complaint ID is used to locate the uploaded PDF (via the index file).
+    Generated word documents are written under ``$BASE_DATA_PATH/letters/<cid>``
+    and the API responds with a JSON summary of the created filenames.  No
+    files are returned to the client; this keeps the backend simple and allows
+    the frontend to acknowledge success once the process completes.
+    """
+    try:
+        # complaint id may be sent via form or JSON
+        complaint_id = None
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            complaint_id = request.form.get('complaint_id')
+            upload = request.files.get('file') or request.files.get('excel')
+        else:
+            data = request.get_json(silent=True) or {}
+            complaint_id = data.get('complaint_id')
+            upload = None
+
+        if not complaint_id:
+            return jsonify({'error': 'complaint_id is required'}), 400
+
+        if not upload:
+            return jsonify({'error': 'no file uploaded'}), 400
+
+        # save the uploaded spreadsheet to a temporary location
+        fd, temp_path = tempfile.mkstemp(suffix=os.path.splitext(upload.filename)[1])
+        os.close(fd)
+        upload.save(temp_path)
+
+        # look up PDF path corresponding to complaint_id
+        pdf_path = None
+        try:
+            if os.path.exists(INDEX_FILE):
+                with open(INDEX_FILE, 'r', encoding='utf-8') as fh:
+                    idx = json.load(fh) or {}
+                fname = idx.get(str(complaint_id))
+                if fname:
+                    candidate = os.path.join(UPLOAD_FOLDER, fname)
+                    if os.path.exists(candidate):
+                        pdf_path = candidate
+        except Exception:
+            app.logger.exception('Error reading index file while generating letters')
+
+        if not pdf_path:
+            return jsonify({'error': 'no PDF found for complaint_id'}), 404
+
+        # call generation function
+        from generate_letters import generate_letters_from_files
+
+        # make a per-complaint output directory; allow override via LETTERS_PATH
+        output_base = os.environ.get('LETTERS_PATH', os.path.join(BASE_DATA_PATH, 'letters'))
+        os.makedirs(output_base, exist_ok=True)
+        output_dir = os.path.join(output_base, str(complaint_id))
+        os.makedirs(output_dir, exist_ok=True)
+
+        generated_files = generate_letters_from_files(pdf_path, temp_path, output_dir=output_dir)
+
+        # cleanup uploaded temp spreadsheet
+        try:
+            os.remove(temp_path)
+        except Exception:
+            pass
+
+        if not generated_files:
+            return jsonify({'error': 'no letters were generated (check template?)'}), 500
+
+        # don't send the files back; just return names so client can show ack
+        return jsonify({'generated': [os.path.basename(f) for f in generated_files]}), 200
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     """Accept multipart/form-data files under 'files' and process them with existing extractor.
@@ -536,6 +616,7 @@ def get_input_format():
         "status": "success",
         "mitigation_measures": response
     })
+
 
 @app.route("/api/mitigation", methods=["POST"])
 def generate_mitigation():

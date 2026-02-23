@@ -43,6 +43,25 @@ A hackathon project featuring a pure frontend web application for managing NCRP 
    - Cyber crime awareness panel with risk categories
    - Process files to extract and analyze complaint data
 
+3. **Generate Letters:**
+   - In the Complaints table, click **Generate Letters** for a specific
+     complaint.
+   - A modal appears prompting you to upload an Excel or CSV file.  A loading
+     spinner is shown while the backend processes the request.
+   - The spreadsheet is posted to `/api/generate_letters` along with the
+     complaint ID.  The server locates the previously-uploaded PDF and runs the
+     generation script.
+   - Generated `.docx` files are saved under the server's data directory
+     (`$NCRP_DATA_PATH/letters/<complaint_id>`; default is
+     `C:\NCRP\letters\<complaint_id>`).  No files are returned to the
+     browser.
+   - After completion the frontend displays an acknowledgement dialog listing
+     the created filenames.  This keeps the UI responsive and avoids
+     transferring large archives.
+
+
+## File Processing
+
 3. **Navigation:**
    - Dashboard: File upload and statistics
    - Complaints: View detailed complaint records

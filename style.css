@@ -183,7 +183,7 @@ footer {
 }
 
 /* Preliminary Action Link Styling */
-.preliminary-action-link {
+.preliminary-action-link, .generate-letters-link {
     color: #007bff;
     text-decoration: none;
     font-weight: 500;

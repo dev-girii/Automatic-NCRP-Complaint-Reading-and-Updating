@@ -246,9 +246,128 @@ def read_image(path):
         )
     )
 
+
+# ---------------- EXCEL READER ----------------
+# Map common Excel header names (case-insensitive) to COLUMNS keys
+_EXCEL_HEADER_ALIASES = {
+    "source": "Source",
+    "complaint id": "Complaint ID",
+    "complaint_id": "Complaint ID",
+    "complaint date": "Complaint Date",
+    "complaint_date": "Complaint Date",
+    "incident date & time": "Incident Date & Time",
+    "incident date": "Incident Date & Time",
+    "incident_datetime": "Incident Date & Time",
+    "incident date and time": "Incident Date & Time",
+    "mobile": "Mobile",
+    "mobile number": "Mobile",
+    "email": "Email",
+    "email id": "Email",
+    "email_id": "Email",
+    "full address": "Full Address",
+    "full_address": "Full Address",
+    "address": "Full Address",
+    "district": "District",
+    "district & state": "District",  # will split later if needed
+    "district_state": "District",
+    "state": "State",
+    "cybercrime type": "Cybercrime Type",
+    "cybercrime_type": "Cybercrime Type",
+    "platform": "Platform",
+    "platform involved": "Platform",
+    "platform_involved": "Platform",
+    "total amount lost": "Total Amount Lost",
+    "total_amount_lost": "Total Amount Lost",
+    "amount": "Total Amount Lost",
+    "total amount loss": "Total Amount Lost",
+    "current status": "Current Status",
+    "current_status": "Current Status",
+    "status": "Current Status",
+}
+
+
+def _normalize_header(h):
+    if h is None:
+        return ""
+    return str(h).strip().lower().replace("\n", " ").replace("\r", "")
+
+
+def read_excel(path):
+    """
+    Read an Excel file (.xlsx or .xls) and extract NCRP-style rows.
+    - First row is treated as headers (mapped to COLUMNS where possible).
+    - Each subsequent row becomes one complaint dict with COLUMNS keys.
+    - Returns a list of dicts (one per data row). Uses pandas for .xlsx and .xls.
+    """
+    ext = os.path.splitext(path)[1].lower()
+    if ext not in (".xlsx", ".xls"):
+        raise ValueError(f"Expected .xlsx or .xls, got {ext}")
+
+    try:
+        df = pd.read_excel(path, engine=None, header=0)
+    except Exception as e:
+        raise ValueError(f"Excel not readable: {e}") from e
+
+    if df.empty or len(df) == 0:
+        return []
+
+    # Map DataFrame column name (normalized) -> COLUMNS key
+    col_map = {}
+    for c in df.columns:
+        norm = _normalize_header(c)
+        if not norm:
+            continue
+        canonical = _EXCEL_HEADER_ALIASES.get(norm)
+        if canonical:
+            col_map[c] = canonical
+        else:
+            canonical = _EXCEL_HEADER_ALIASES.get(norm.replace("  ", " "))
+            if canonical:
+                col_map[c] = canonical
+
+    if not col_map:
+        return []
+
+    rows_out = []
+    for _, r in df.iterrows():
+        if r.isna().all():
+            continue
+        record = {col: "NOT FOUND" for col in COLUMNS}
+        record["Source"] = "EXCEL"
+        for excel_col, key in col_map.items():
+            val = r.get(excel_col)
+            if pd.isna(val) or (isinstance(val, str) and not val.strip()):
+                continue
+            if hasattr(val, "strip"):
+                val = str(val).strip()
+            else:
+                val = str(val).strip() if val is not None else ""
+            if key == "District" and record.get("State") == "NOT FOUND":
+                if "," in val or " and " in val.lower():
+                    parts = re.split(r",|\s+and\s+", val, maxsplit=1, flags=re.IGNORECASE)
+                    record["District"] = parts[0].strip() if parts else val
+                    record["State"] = parts[1].strip() if len(parts) > 1 else "NOT FOUND"
+                else:
+                    record["District"] = val
+            else:
+                record[key] = val
+        rows_out.append(record)
+
+    return rows_out
+
+
 # ---------------- EXTRACTION ----------------
 def extract_ncrp(file_path):
     ext = os.path.splitext(file_path)[1].lower()
+
+    # Excel: return list of dicts (one per row)
+    if ext in (".xlsx", ".xls"):
+        rows = read_excel(file_path)
+        if not rows:
+            return {"Source": "EXCEL", "Complaint ID": "", "error": "no data rows in Excel"}
+        return rows
+
+    # PDF or Image: single dict from text extraction
     text = read_pdf(file_path) if ext == ".pdf" else read_image(file_path)
     source = "PDF" if ext == ".pdf" else "IMAGE"
 
@@ -397,10 +516,10 @@ def save_df_to_mysql(df, *, user, password, host="localhost", port=3306, db="ncr
     engine.dispose()
 
 if __name__ == "__main__":
-    files = [f for f in os.listdir() if f.lower().endswith((".pdf", ".jpg", ".jpeg", ".png"))]
+    files = [f for f in os.listdir() if f.lower().endswith((".pdf", ".jpg", ".jpeg", ".png", ".xlsx", ".xls"))]
 
     if not files:
-        print("❌ No PDF or Image files found in folder")
+        print("❌ No PDF, Image or Excel files found in folder")
         exit()
 
     # Optional: use AI parsing pipeline (from ncrp_automation) when USE_AI env var is set
@@ -476,10 +595,17 @@ if __name__ == "__main__":
     for f in files:
         try:
             print(f"🔍 Processing: {f}")
-            rows.append(extract_ncrp(f))
+            result = extract_ncrp(f)
+            if isinstance(result, list):
+                rows.extend(result)
+            else:
+                rows.append(result)
         except Exception as e:
             print(f"⚠ Failed on {f}: {e}")
 
+    if not rows:
+        print("❌ No rows extracted")
+        exit()
     df = pd.DataFrame(rows, columns=COLUMNS)
 
     # Helper: save Excel safely. If the target file is locked (PermissionError),

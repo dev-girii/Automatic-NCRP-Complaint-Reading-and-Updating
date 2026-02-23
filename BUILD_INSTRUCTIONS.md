@@ -18,6 +18,12 @@ Before building the application, make sure you have the following installed:
 
 ## Build Procedure (with bundled Tesseract)
 
+> **New dependencies:** the letter‑generation feature introduced in 2026
+> requires `pdfplumber` and `python-docx` on the backend.  They are included in
+> `backend/requirements.txt`; simply re‑install using pip after pulling the
+> latest changes.
+
+
 ### Step 1: Setup Tesseract (one-time)
 
 Run **`setup-tesseract.bat`** to copy Tesseract into `tools/tesseract/`:
@@ -45,6 +51,13 @@ Find your executables in the **`dist`** folder:
 - **NCRP Complaint Tool Setup x.x.x.exe** - Windows installer
 
 ## What happens when the user runs the exe
+
+> **Letter storage location:** the backend will write generated letters to a
+> subfolder under the data path.  By default this is
+> `%APPDATA%\ncrp-complaint-tool\data\letters\<complaint_id>` (same as
+> `C:\NCRP\letters` during development).  You can override the base folder by
+> setting the `LETTERS_PATH` environment variable.
+
 
 1. **Backend auto-starts** - The Flask/Python backend runs automatically (no manual start)
 2. **Tesseract is bundled** - OCR works from `tools/tesseract/` inside the app (relative path)

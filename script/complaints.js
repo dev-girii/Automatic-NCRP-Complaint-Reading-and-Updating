@@ -135,6 +135,7 @@ function appendRowsToTable(rows) {
             <td>${complaint.processedDateTime || ''}</td>
             <td>${fileLink ? `<a href="${fileLink}" target="_blank" rel="noopener" class="view-details-link">Open File</a>` : '<span class="text-muted">N/A</span>'}</td>
             <td><a href="#" class="preliminary-action-link">Click Here</a></td>
+            <td><a href="#" class="generate-letters-link">Generate Letters</a></td>
         `;
         tbody.appendChild(row);
     });
@@ -155,6 +156,67 @@ $('.form-control, .form-select').off('change keyup').on('change keyup', function
 });
 
 }
+
+// open modal when Generate Letters link clicked
+$(document).on('click', '.generate-letters-link', function(e) {
+    e.preventDefault();
+    const row = $(this).closest('tr');
+    const cid = row.find('td').first().text().trim();
+    $('#modalComplaintId').val(cid);
+    $('#lettersFile').val('');
+    $('#lettersError').hide();
+    const modal = new bootstrap.Modal(document.getElementById('generateLettersModal'));
+    modal.show();
+});
+
+// submit the form to backend
+$('#generateLettersForm').on('submit', function(e) {
+    e.preventDefault();
+    const cid = $('#modalComplaintId').val();
+    const fileInput = $('#lettersFile')[0];
+    if (!fileInput.files.length) {
+        $('#lettersError').text('Please select a file').show();
+        return;
+    }
+    const f = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('complaint_id', cid);
+    formData.append('file', f);
+    const base = window.HARDCODED_API_BASE || 'http://127.0.0.1:5000';
+
+    // show loading dialog
+    Swal.fire({
+        title: 'Generating letters...',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    fetch(base + '/api/generate_letters', {
+        method: 'POST',
+        body: formData
+    }).then(res => {
+        if (res.ok) {
+            return res.json();
+        } else {
+            return res.json().then(j => { throw j; });
+        }
+    }).then(json => {
+        Swal.close();
+        bootstrap.Modal.getInstance(document.getElementById('generateLettersModal')).hide();
+        Swal.fire({
+            icon: 'success',
+            title: 'Letters generated',
+            text: `Saved to server under complaint ${cid}.`,
+            footer: json.generated ? `Files: ${json.generated.join(', ')}` : ''
+        });
+    }).catch(err => {
+        Swal.close();
+        console.error('letter generation error', err);
+        $('#lettersError').text(err && err.error ? err.error : 'Failed to generate letters').show();
+    });
+});
 
 function complaintToMitigationPayload(complaint) {
     const ds = (complaint.districtState || '').split(', ');

@@ -134,6 +134,7 @@
                             <th>Processed Date & Time</th>
                             <th>View Details</th>
                             <th>Preliminary Action</th>
+                            <th>Generate Letters</th>
                         </tr>
                     </thead>
                     <tbody id="complaints-tbody"></tbody>
@@ -141,6 +142,30 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Modal used to upload spreadsheet for letter generation -->
+    <div class="modal fade" id="generateLettersModal" tabindex="-1" aria-labelledby="generateLettersLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <form id="generateLettersForm" class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="generateLettersLabel">Upload Spreadsheet</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="modalComplaintId">
+            <div class="mb-3">
+              <label for="lettersFile" class="form-label">Excel or CSV file</label>
+              <input class="form-control" type="file" id="lettersFile" accept=".xlsx,.xls,.csv" required>
+            </div>
+            <div id="lettersError" class="text-danger" style="display:none;"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="submit" class="btn btn-primary">Generate</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
